@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Newtonsoft.Json;
+using NLog;
 using Stratis.Bitcoin.AsyncWork;
 using Stratis.Bitcoin.Configuration;
 using Stratis.Bitcoin.Configuration.Logging;
@@ -109,7 +109,6 @@ namespace Stratis.Bitcoin.Features.PoA
             IDateTimeProvider dateTimeProvider,
             Network network,
             INodeLifetime nodeLifetime,
-            ILoggerFactory loggerFactory,
             IInitialBlockDownloadState ibdState,
             BlockDefinition blockDefinition,
             ISlotsManager slotsManager,
@@ -144,7 +143,7 @@ namespace Stratis.Bitcoin.Features.PoA
             this.idleFederationMembersKicker = idleFederationMembersKicker;
             this.nodeLifetime = nodeLifetime;
 
-            this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.logger = LogManager.GetCurrentClassLogger();
             this.cancellation = CancellationTokenSource.CreateLinkedTokenSource(new[] { nodeLifetime.ApplicationStopping });
             this.votingDataEncoder = new VotingDataEncoder();
             this.nodeSettings = nodeSettings;
@@ -171,7 +170,7 @@ namespace Stratis.Bitcoin.Features.PoA
                 }
                 catch (Exception e)
                 {
-                    this.logger.LogWarning("Exception raised when gathering mining statistics; {0}", e);
+                    this.logger.Warn("Exception raised when gathering mining statistics; {0}", e);
                 }
 
                 return Task.CompletedTask;
@@ -221,7 +220,7 @@ namespace Stratis.Bitcoin.Features.PoA
             int maxDepth = modifiedFederation.Count;
 
             // TODO: Make this a command line option.
-            bool includeHeight = false;
+            bool includeHeight = true;
 
             log.AppendLine($"Mining information for the last { maxDepth } blocks.");
             if (includeHeight)
@@ -231,20 +230,31 @@ namespace Stratis.Bitcoin.Features.PoA
 
             uint currentSlotTime = (uint)this.dateTimeProvider.GetAdjustedTimeAsUnixTimestamp();
             currentSlotTime -= currentSlotTime % this.network.ConsensusOptions.TargetSpacingSeconds;
+            this.logger.Debug($"{nameof(currentSlotTime)}:{currentSlotTime}");
+
             if (currentHeader.Header.Time > currentSlotTime)
+            {
                 currentSlotTime = currentHeader.Header.Time;
+                this.logger.Debug($"{nameof(currentSlotTime)}:{currentSlotTime}");
+            }
 
             // Determine the number of slots before this node will mine.
             uint slotOffset = (this.slotsManager.GetMiningTimestamp(currentSlotTime) - currentSlotTime) / this.network.ConsensusOptions.TargetSpacingSeconds;
+            this.logger.Debug($"{nameof(slotOffset)}:{slotOffset}");
 
             // Determine the current slot from that.
             int mySlotIndex = modifiedFederation.FindIndex(m => m.PubKey == this.federationManager.CurrentFederationKey?.PubKey);
+            this.logger.Debug($"{nameof(mySlotIndex)}:{mySlotIndex}");
             int currentSlot = (int)(mySlotIndex - slotOffset) % modifiedFederation.Count;
+            this.logger.Debug($"Before {nameof(currentSlot)}:{currentSlot}");
             while (currentSlot < 0)
                 currentSlot += modifiedFederation.Count;
 
+            this.logger.Debug($"After {nameof(currentSlot)}:{currentSlot}");
             // Determine the public key of the current slot.
             PubKey pubKey = modifiedFederation[currentSlot].PubKey;
+
+            this.logger.Debug($"{nameof(pubKey)}:{pubKey}");
 
             // Iterate mining slots.
             for (int i = 0; i < maxDepth; i++)
@@ -258,7 +268,7 @@ namespace Stratis.Bitcoin.Features.PoA
                 if (currentHeader.Header.Time == currentSlotTime)
                 {
                     if (includeHeight)
-                        log.Append($"{currentHeader.Height.ToString().PadLeft(7)}:{ pubKeyRepresentation } ");
+                        log.Append($"{currentHeader.Height,7}:{ pubKeyRepresentation } ");
                     else
                         log.Append($"[{pubKeyRepresentation}] ");
 
@@ -291,9 +301,16 @@ namespace Stratis.Bitcoin.Features.PoA
                 }
 
                 index = (index > 0) ? (index - 1) : (modifiedFederation.Count - 1);
+
+                this.logger.Debug($"{nameof(index)}:{index}");
+
                 pubKey = modifiedFederation[index].PubKey;
 
+                this.logger.Debug($"{nameof(pubKey)}:{pubKey}");
+
                 currentSlotTime -= this.network.ConsensusOptions.TargetSpacingSeconds;
+
+                this.logger.Debug($"{nameof(currentSlotTime)}:{currentSlotTime}");
 
                 if (((i + 1) % (includeHeight ? 10 : 20)) == 0)
                     log.AppendLine();
@@ -316,7 +333,7 @@ namespace Stratis.Bitcoin.Features.PoA
             {
                 try
                 {
-                    this.logger.LogDebug("IsInitialBlockDownload={0}, AnyConnectedPeers={1}, BootstrappingMode={2}, IsFederationMember={3}",
+                    this.logger.Debug("IsInitialBlockDownload={0}, AnyConnectedPeers={1}, BootstrappingMode={2}, IsFederationMember={3}",
                         this.ibdState.IsInitialBlockDownload(), this.connectionManager.ConnectedPeers.Any(), this.poaSettings.BootstrappingMode, this.federationManager.IsFederationMember);
 
                     // Don't mine in IBD or if we aren't connected to any node (unless bootstrapping mode is enabled).
@@ -334,7 +351,7 @@ namespace Stratis.Bitcoin.Features.PoA
                             builder1.AppendLine("<<==============================================================>>");
                             builder1.AppendLine($"Can't mine due to {cause}.");
                             builder1.AppendLine("<<==============================================================>>");
-                            this.logger.LogInformation(builder1.ToString());
+                            this.logger.Info(builder1.ToString());
                         }
 
                         int attemptDelayMs = 30_000;
@@ -360,7 +377,7 @@ namespace Stratis.Bitcoin.Features.PoA
                     builder.AppendLine($"Block mined hash   : '{chainedHeader}'");
                     builder.AppendLine($"Block miner pubkey : '{this.federationManager.CurrentFederationKey.PubKey}'");
                     builder.AppendLine("<<==============================================================>>");
-                    this.logger.LogInformation(builder.ToString());
+                    this.logger.Info(builder.ToString());
 
                     // If DevMode is enabled the miner will continue it's bootstrapped mining, i.e. without any connections.
                     if ((this.nodeSettings.DevMode != null && this.nodeSettings.DevMode == DevModeNodeRole.Miner))
@@ -371,7 +388,7 @@ namespace Stratis.Bitcoin.Features.PoA
                     // Additionally, keeping it enabled may result in network splits if this node becomes disconnected from its peers for a prolonged period.
                     if (this.poaSettings.BootstrappingMode)
                     {
-                        this.logger.LogInformation("Disabling bootstrap mode as a block has been successfully mined.");
+                        this.logger.Info("Disabling bootstrap mode as a block has been successfully mined.");
                         this.poaSettings.DisableBootstrap();
                     }
                 }
@@ -384,7 +401,7 @@ namespace Stratis.Bitcoin.Features.PoA
                     // All consensus exceptions should be ignored. It means that the miner
                     // ran into problems while constructing block or verifying it
                     // but it should not halt the mining operation.
-                    this.logger.LogWarning("Miner failed to mine block due to: '{0}'.", ce.ConsensusError.Message);
+                    this.logger.Warn("Miner failed to mine block due to: '{0}'.", ce.ConsensusError.Message);
                 }
                 catch (ConsensusException ce)
                 {
@@ -392,11 +409,11 @@ namespace Stratis.Bitcoin.Features.PoA
                     // All consensus exceptions (including translated ConsensusErrorException) should be ignored. It means that the miner
                     // ran into problems while constructing block or verifying it
                     // but it should not halt the mining operation.
-                    this.logger.LogWarning("Miner failed to mine block due to: '{0}'.", ce.Message);
+                    this.logger.Warn("Miner failed to mine block due to: '{0}'.", ce.Message);
                 }
                 catch (Exception exception)
                 {
-                    this.logger.LogCritical("Exception occurred during mining: {0}", exception.ToString());
+                    this.logger.Fatal("Exception occurred during mining: {0}", exception.ToString());
                     break;
                 }
             }
@@ -424,7 +441,7 @@ namespace Stratis.Bitcoin.Features.PoA
                     }
                     catch (NotAFederationMemberException)
                     {
-                        this.logger.LogWarning("This node is no longer a federation member!");
+                        this.logger.Warn("This node is no longer a federation member!");
 
                         throw new OperationCanceledException();
                     }
@@ -447,8 +464,8 @@ namespace Stratis.Bitcoin.Features.PoA
             if (timestamp <= tip.Header.Time)
             {
                 // Can happen only when target spacing had crazy low value or key was compromised and someone is mining with our key.
-                this.logger.LogWarning("Somehow another block was connected with greater timestamp. Dropping current block.");
-                this.logger.LogTrace("(-)[ANOTHER_BLOCK_CONNECTED]:null");
+                this.logger.Warn("Somehow another block was connected with greater timestamp. Dropping current block.");
+                this.logger.Trace("(-)[ANOTHER_BLOCK_CONNECTED]:null");
                 return null;
             }
 
@@ -470,7 +487,7 @@ namespace Stratis.Bitcoin.Features.PoA
                     if (miningAddress == null)
                     {
                         // The node could not have a wallet, or the first account/address could have been incorrectly created.
-                        this.logger.LogWarning("The miner wasn't able to get an address from the wallet, you will not receive any rewards (if no wallet exists, please create one).");
+                        this.logger.Warn("The miner wasn't able to get an address from the wallet, you will not receive any rewards (if no wallet exists, please create one).");
                         this.walletScriptPubKey = new Script();
                     }
                     else
@@ -487,7 +504,7 @@ namespace Stratis.Bitcoin.Features.PoA
 
             if (dropTemplate)
             {
-                this.logger.LogTrace("(-)[DROPPED]:null");
+                this.logger.Trace("(-)[DROPPED]:null");
                 return null;
             }
 
@@ -505,7 +522,7 @@ namespace Stratis.Bitcoin.Features.PoA
             if (chainedHeader == null)
             {
                 // Block wasn't accepted because we already connected block from the network.
-                this.logger.LogTrace("(-)[FAILED_TO_CONNECT]:null");
+                this.logger.Trace("(-)[FAILED_TO_CONNECT]:null");
                 return null;
             }
 
@@ -513,7 +530,7 @@ namespace Stratis.Bitcoin.Features.PoA
             if (result.Error != null)
             {
                 // Sanity check. Should never happen.
-                this.logger.LogTrace("(-)[INTEGRITY_FAILURE]");
+                this.logger.Trace("(-)[INTEGRITY_FAILURE]");
                 throw new Exception(result.Error.ToString());
             }
 
@@ -564,7 +581,7 @@ namespace Stratis.Bitcoin.Features.PoA
 
             if (scheduledVotes.Count == 0)
             {
-                this.logger.LogTrace("(-)[NO_DATA]");
+                this.logger.Trace("(-)[NO_DATA]");
                 return;
             }
 

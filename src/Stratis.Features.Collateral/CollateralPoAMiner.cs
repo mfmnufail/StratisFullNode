@@ -45,8 +45,8 @@ namespace Stratis.Features.Collateral
             INodeStats nodeStats, VotingManager votingManager, PoASettings poAMinerSettings, ICollateralChecker collateralChecker, IAsyncProvider asyncProvider, ICounterChainSettings counterChainSettings,
             IIdleFederationMembersKicker idleFederationMembersKicker,
             NodeSettings nodeSettings)
-            : base(consensusManager, dateTimeProvider, network, nodeLifetime, loggerFactory, ibdState, blockDefinition, slotsManager, connectionManager,
-            poaHeaderValidator, federationManager, federationHistory, integrityValidator, walletManager, nodeStats, votingManager, poAMinerSettings, asyncProvider, idleFederationMembersKicker, nodeSettings)
+            : base(consensusManager, dateTimeProvider, network, nodeLifetime, ibdState, blockDefinition, slotsManager, connectionManager, poaHeaderValidator,
+            federationManager, federationHistory, integrityValidator, walletManager, nodeStats, votingManager, poAMinerSettings, asyncProvider, idleFederationMembersKicker, nodeSettings)
         {
             this.counterChainNetwork = counterChainSettings.CounterChainNetwork;
             this.collateralChecker = collateralChecker;
@@ -71,9 +71,9 @@ namespace Stratis.Features.Collateral
             {
                 dropTemplate = true;
                 if (counterChainHeight != 0)
-                    this.logger.LogWarning("Counter chain should first advance at least at {0}! Block can't be produced.", maxReorgLength + AddressIndexer.SyncBuffer);
+                    this.logger.Warn("Counter chain should first advance at least at {0}! Block can't be produced.", maxReorgLength + AddressIndexer.SyncBuffer);
 
-                this.logger.LogTrace("(-)[LOW_COMMITMENT_HEIGHT]");
+                this.logger.Trace("(-)[LOW_COMMITMENT_HEIGHT]");
                 return;
             }
 
@@ -82,8 +82,8 @@ namespace Stratis.Features.Collateral
             if (currentMember == null)
             {
                 dropTemplate = true;
-                this.logger.LogWarning("Unable to get this node's federation member!");
-                this.logger.LogTrace("(-)[CANT_GET_FED_MEMBER]");
+                this.logger.Warn("Unable to get this node's federation member!");
+                this.logger.Trace("(-)[CANT_GET_FED_MEMBER]");
                 return;
             }
 
@@ -93,8 +93,8 @@ namespace Stratis.Features.Collateral
             if (!success)
             {
                 dropTemplate = true;
-                this.logger.LogWarning("Failed to fulfill collateral requirement for mining!");
-                this.logger.LogTrace("(-)[BAD_COLLATERAL]");
+                this.logger.Warn("Failed to fulfill collateral requirement for mining!");
+                this.logger.Trace("(-)[BAD_COLLATERAL]");
                 return;
             }
 
@@ -152,7 +152,7 @@ namespace Stratis.Features.Collateral
             }
             catch (Exception e)
             {
-                this.logger.LogError("Exception occurred: {0}", e.ToString());
+                this.logger.Error("Exception occurred: {0}", e.ToString());
                 return;
             }
         }

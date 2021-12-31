@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using NBitcoin;
+using NLog;
 using Stratis.Bitcoin.Utilities;
 
 namespace Stratis.Bitcoin.Features.PoA
@@ -32,6 +33,8 @@ namespace Stratis.Bitcoin.Features.PoA
 
         private readonly ChainIndexer chainIndexer;
 
+        private readonly Logger logger;
+
         public SlotsManager(Network network, IFederationManager federationManager, IFederationHistory federationHistory, ChainIndexer chainIndexer)
         {
             Guard.NotNull(network, nameof(network));
@@ -40,6 +43,7 @@ namespace Stratis.Bitcoin.Features.PoA
             this.federationHistory = federationHistory;
             this.chainIndexer = chainIndexer;
             this.consensusOptions = (network as PoANetwork).ConsensusOptions;
+            this.logger = LogManager.GetCurrentClassLogger();
         }
 
         public uint GetMiningTimestamp(uint currentTime)
@@ -61,11 +65,13 @@ namespace Stratis.Bitcoin.Features.PoA
                 throw new Exception($"Could not determine the federation at block { tip.Height } + 1.");
 
             int myIndex = federationMembers.FindIndex(m => m.PubKey == this.federationManager.CurrentFederationKey?.PubKey);
+            this.logger.Debug($"{nameof(myIndex)}:{myIndex}");
             if (myIndex < 0)
                 throw new NotAFederationMemberException();
 
             // Find a "reference miner" to determine our slot against.
             ChainedHeader referenceMinerBlock = tip;
+            this.logger.Debug($"{nameof(referenceMinerBlock)}:{referenceMinerBlock}");
             IFederationMember referenceMiner = null;
             int referenceMinerIndex = -1;
             int referenceMinerDepth = 0;
@@ -77,31 +83,47 @@ namespace Stratis.Bitcoin.Features.PoA
                     break;
             }
 
+            this.logger.Debug($"{nameof(referenceMiner)}:{referenceMiner?.PubKey}");
+            this.logger.Debug($"{nameof(referenceMinerIndex)}:{referenceMinerIndex}");
+            this.logger.Debug($"{nameof(referenceMinerDepth)}:{referenceMinerDepth}");
+
             if (referenceMinerIndex < 0)
                 throw new Exception("Could not find a member in common between the old and new federation");
 
             // Found a reference miner that also occurs in the latest federation.
             // Determine how many blocks before our mining slot.
             int blocksFromTipToMiningSlot = myIndex - referenceMinerIndex - referenceMinerDepth;
+            this.logger.Debug($"Start {nameof(blocksFromTipToMiningSlot)}:{blocksFromTipToMiningSlot}");
+
             while (blocksFromTipToMiningSlot < 0)
                 blocksFromTipToMiningSlot += federationMembers.Count;
 
+            this.logger.Debug($"End {nameof(blocksFromTipToMiningSlot)}:{blocksFromTipToMiningSlot}");
+
             // Round length in seconds.
             uint roundTime = (uint)this.GetRoundLength(federationMembers.Count).TotalSeconds;
+
+            this.logger.Debug($"{nameof(roundTime)}:{roundTime}");
 
             // Get the tip time and make is a valid time if required.
             uint tipTime = tip.Header.Time;
             if (!IsValidTimestamp(tipTime))
                 tipTime += (this.consensusOptions.TargetSpacingSeconds - tipTime % this.consensusOptions.TargetSpacingSeconds);
 
+            this.logger.Debug($"{nameof(tipTime)}:{roundTime}");
+
             // Check if we have missed our turn for this round.
             // We still consider ourselves "in a turn" if we are in the first half of the turn and we haven't mined there yet.
             // This might happen when starting the node for the first time or if there was a problem when mining.
 
             uint nextTimestampForMining = (uint)(tipTime + blocksFromTipToMiningSlot * this.consensusOptions.TargetSpacingSeconds);
+            this.logger.Debug($"Start {nameof(nextTimestampForMining)}:{nextTimestampForMining}");
+
             while (currentTime > nextTimestampForMining + (this.consensusOptions.TargetSpacingSeconds / 2) // We are closer to the next turn than our own
                   || tipTime == nextTimestampForMining)
                 nextTimestampForMining += roundTime;
+
+            this.logger.Debug($"End {nameof(nextTimestampForMining)}:{nextTimestampForMining}");
 
             return nextTimestampForMining;
         }
