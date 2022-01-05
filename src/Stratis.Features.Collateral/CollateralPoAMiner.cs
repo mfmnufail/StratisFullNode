@@ -129,13 +129,13 @@ namespace Stratis.Features.Collateral
 
                 if (!pendingAddFederationMemberPolls.Any())
                 {
-                    this.logger.LogDebug("There are no outstanding add member polls for this node to vote on.");
+                    this.logger.Debug("There are no outstanding add member polls for this node to vote on.");
                     return;
                 }
 
                 foreach (Poll poll in pendingAddFederationMemberPolls)
                 {
-                    this.logger.LogDebug($"Attempting to cast outstanding vote on poll '{poll.Id}'.");
+                    this.logger.Debug($"Attempting to cast outstanding vote on poll '{poll.Id}'.");
 
                     ChainedHeader pollStartHeader = this.chainIndexer.GetHeader(poll.PollStartBlockData.Hash);
                     ChainedHeader votingRequestHeader = pollStartHeader.Previous;
