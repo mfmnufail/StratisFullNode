@@ -63,9 +63,9 @@ namespace Stratis.Sidechains.Networks
             this.Genesis = genesisBlock;
 
             this.FederationMnemonics = new[] {
-                "ensure feel swift crucial bridge charge cloud tell hobby twenty people mandate",
-                "quiz sunset vote alley draw turkey hill scrap lumber game differ fiction",
-                "exchange rent bronze pole post hurry oppose drama eternal voice client state"
+                "sorry enforce click pill gap science mention action hint bulb faint solid",
+                "belt ordinary child purity nerve antenna cereal day inquiry remain glass test",
+                "tuna nerve endorse awful cycle visit laptop casual toddler program valley attend"
             }.Select(m => new Mnemonic(m, Wordlist.English)).ToList();
 
             this.FederationKeys = this.FederationMnemonics.Select(m => m.DeriveExtKey().PrivateKey).ToList();
@@ -76,27 +76,24 @@ namespace Stratis.Sidechains.Networks
             foreach (PubKey pubKey in federationPubKeys)
                 genesisFederationMembers.Add(new CollateralFederationMember(pubKey, true, new Money(0), null));
 
-            // Will replace the last multisig member.
-            var newFederationMemberMnemonics = new string[]
-            {
-                "fat chalk grant major hair possible adjust talent magnet lobster retreat siren"
-            }.Select(m => new Mnemonic(m, Wordlist.English)).ToList();
-
-            var newFederationKeys = this.FederationMnemonics.Take(2).Concat(newFederationMemberMnemonics).Select(m => m.DeriveExtKey().PrivateKey).ToList();
-            var newFederationPubKeys = newFederationKeys.Select(k => k.PubKey).ToList();
-
             // The height at which the following list of members apply.
             this.MultisigMinersApplicabilityHeight = 0;
 
             // Mining keys!
-            this.StraxMiningMultisigMembers = newFederationPubKeys;
+            this.StraxMiningMultisigMembers = federationPubKeys;
 
             // Register only the new federation as we won't be doing anything with the old federation.
             this.Federations = new Federations();
 
             // Default transaction-signing keys!
-            // Use the new keys as the old keys should never be used by the new opcode.
-            this.Federations.RegisterFederation(new Federation(newFederationPubKeys.ToArray()));
+            var straxFederationTransactionSigningKeys = new List<PubKey>()
+            {
+                new PubKey("0285676f2a359d6da1e0c7bbd080100ac7d86f1a4cd882ca5a87e96d6de4a8137e"),
+                new PubKey("02247e4f53d91349e862bfaad1b2ec4a27cebae23fdaf94e8908b084e97ea38902"),
+                new PubKey("033b1955f97ee4b6a978680ae1870031ed9f76565c935f23fbdc95a9fe3b24fa91"),
+            };
+
+            this.Federations.RegisterFederation(new Federation(straxFederationTransactionSigningKeys.ToArray()));
 
             var consensusOptions = new PoAConsensusOptions(
                 maxBlockBaseSize: 1_000_000,
@@ -107,10 +104,12 @@ namespace Stratis.Sidechains.Networks
                 genesisFederationMembers: genesisFederationMembers,
                 targetSpacingSeconds: 16,
                 votingEnabled: true,
-                autoKickIdleMembers: true)
+                autoKickIdleMembers: true,
+                federationMemberMaxIdleTimeSeconds: 60 * 30)
             {
                 GetMiningTimestampV2ActivationHeight = 100,
-                PollExpiryBlocks = 450 // 2 hours
+                PollExpiryBlocks = 225, // 2 hours
+                Release1100ActivationHeight = 2000,
             };
 
             var buriedDeployments = new BuriedDeploymentsArray

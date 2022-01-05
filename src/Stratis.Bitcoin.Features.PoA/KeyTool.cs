@@ -21,6 +21,14 @@ namespace Stratis.Bitcoin.Features.PoA
         }
 
         /// <summary>Generates a new private key.</summary>
+        public Key GeneratePrivateKey(Mnemonic mnemonic)
+        {
+            Key privateKey = mnemonic.DeriveExtKey().PrivateKey;
+
+            return privateKey;
+        }
+
+        /// <summary>Generates a new private key.</summary>
         public Key GeneratePrivateKey()
         {
             var mnemonic = new Mnemonic(Wordlist.English, WordCount.Twelve);

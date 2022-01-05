@@ -211,7 +211,7 @@ namespace FederationSetup
             // Generate keys for migning.
             var tool = new KeyTool(keyPath);
 
-            Key key = tool.GeneratePrivateKey();
+            Key key = tool.GeneratePrivateKey(mnemonicForSigningKey);
 
             string savePath = tool.GetPrivateKeySavePath();
             tool.SavePrivateKey(key);
