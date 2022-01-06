@@ -281,7 +281,8 @@ namespace Stratis.Bitcoin.Features.PoA
 
                 if (includeHeight)
                 {
-                    string strHeight = minedInThisSlot ? currentHeader.Height.ToString().PadLeft(7) : "---MISS";
+                    string strHeight = minedInThisSlot ? $"{currentHeader.Height,7}" : $"{currentHeader.Height,7} (MISS)";
+
                     log.Append($"{strHeight}:{ pubKeyRepresentation } ");
                 }
                 else
@@ -302,8 +303,8 @@ namespace Stratis.Bitcoin.Features.PoA
 
             log.Append("...");
             log.AppendLine();
-            log.AppendLine($"Miner hits".PadRight(LoggingConfiguration.ColumnLength) + $": {hitCount} of {maxDepth}({(((float)hitCount / (float)maxDepth)).ToString("P2")})");
-            log.AppendLine($"Miner idle time".PadRight(LoggingConfiguration.ColumnLength) + $": { TimeSpan.FromSeconds(this.network.ConsensusOptions.TargetSpacingSeconds * (maxDepth - hitCount)).ToString(@"hh\:mm\:ss")}");
+            log.AppendLine($"Miner hits".PadRight(LoggingConfiguration.ColumnLength) + $": {hitCount} of {maxDepth}({(float)hitCount / (float)maxDepth:P2})");
+            log.AppendLine($"Miner idle time".PadRight(LoggingConfiguration.ColumnLength) + $": { TimeSpan.FromSeconds(this.network.ConsensusOptions.TargetSpacingSeconds * (maxDepth - hitCount)):hh\\:mm\\:ss}");
             log.AppendLine();
 
             this.miningStatisticsLog = log.ToString();
